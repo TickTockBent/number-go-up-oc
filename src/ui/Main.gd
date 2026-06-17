@@ -14,7 +14,11 @@ var _number_label: Label
 var _rate_label: Label
 var _total_label: Label
 var _prestige_label: Label
+var _ascension_label: Label
+var _transcendence_label: Label
 var _prestige_button: Button
+var _ascension_button: Button
+var _transcendence_button: Button
 var _message_label: Label
 var _upgrade_container: VBoxContainer
 var _overlay: Control
@@ -31,6 +35,9 @@ func _ready() -> void:
 	_build_ui()
 	_refresh_all_rows()
 	_refresh_prestige()
+	_refresh_ascension()
+	_refresh_transcendence()
+	_apply_number_color()
 	if report.get("tampered", false):
 		_show_cheater()
 	elif report.get("loaded", false) and float(report.get("offline_seconds", 0.0)) > 1.0:
@@ -40,6 +47,8 @@ func _ready() -> void:
 	GameState.rate_changed.connect(_on_rate_changed)
 	GameState.upgrade_purchased.connect(_on_upgrade_purchased)
 	GameState.prestige_performed.connect(_on_prestige_performed)
+	GameState.ascension_performed.connect(_on_ascension_performed)
+	GameState.transcendence_performed.connect(_on_transcendence_performed)
 	GameState.message_emitted.connect(_on_message_emitted)
 	GameState.red_corruption_changed.connect(_on_red_corruption_changed)
 	FunnyNumbers.popup_fired.connect(_on_funny_popup)
@@ -79,6 +88,8 @@ func _build_ui() -> void:
 	_rate_label = _make_status_label(status, "/s: 0")
 	_total_label = _make_status_label(status, "total: 0")
 	_prestige_label = _make_status_label(status, "prestige: 0")
+	_ascension_label = _make_status_label(status, "ascension: 0")
+	_transcendence_label = _make_status_label(status, "transc.: 0")
 
 	# Message line.
 	_message_label = Label.new()
@@ -108,8 +119,24 @@ func _build_ui() -> void:
 	_prestige_button.pressed.connect(_on_prestige_pressed)
 	left_col.add_child(_prestige_button)
 
+	_ascension_button = Button.new()
+	_ascension_button.text = "ASCEND\n(locked — reach prestige 10)"
+	_ascension_button.add_theme_font_size_override("font_size", 18)
+	_ascension_button.add_theme_color_override("font_color", COLOR_GOLD)
+	_ascension_button.custom_minimum_size = Vector2(0, 70)
+	_ascension_button.pressed.connect(_on_ascension_pressed)
+	left_col.add_child(_ascension_button)
+
+	_transcendence_button = Button.new()
+	_transcendence_button.text = "TRANSCEND\n(locked — reach ascension 5)"
+	_transcendence_button.add_theme_font_size_override("font_size", 18)
+	_transcendence_button.add_theme_color_override("font_color", Color("#cc44ff"))
+	_transcendence_button.custom_minimum_size = Vector2(0, 70)
+	_transcendence_button.pressed.connect(_on_transcendence_pressed)
+	left_col.add_child(_transcendence_button)
+
 	var help := Label.new()
-	help.text = "Prestige resets the number and all upgrades for +2% production per level. The slow penalty persists. Suffer."
+	help.text = "Prestige: +2%/lvl (slow persists). Ascend at prestige 10: x1.1/lvl, resets prestige + slow. Transcend at ascension 5: +5%/lvl, full reset, number shifts hue 30°/lvl."
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	help.add_theme_color_override("font_color", COLOR_DIM)
 	help.add_theme_font_size_override("font_size", 13)
@@ -241,6 +268,24 @@ func _refresh_prestige() -> void:
 		_prestige_button.disabled = true
 	_prestige_label.text = "prestige: %d" % GameState.prestige_level
 
+func _refresh_ascension() -> void:
+	if GameState.can_ascend():
+		_ascension_button.text = "ASCEND\nlevel %d → %d\n(x1.1 production/lvl, resets prestige + slow)" % [GameState.ascension_level, GameState.ascension_level + 1]
+		_ascension_button.disabled = false
+	else:
+		_ascension_button.text = "ASCEND\n(locked — reach prestige %d)" % GameState.ASCENSION_UNLOCK_LEVEL
+		_ascension_button.disabled = true
+	_ascension_label.text = "ascension: %d" % GameState.ascension_level
+
+func _refresh_transcendence() -> void:
+	if GameState.can_transcend():
+		_transcendence_button.text = "TRANSCEND\nlevel %d → %d\n(+5%%/lvl, full reset, hue shift)" % [GameState.transcendence_level, GameState.transcendence_level + 1]
+		_transcendence_button.disabled = false
+	else:
+		_transcendence_button.text = "TRANSCEND\n(locked — reach ascension %d)" % GameState.TRANSCENDENCE_UNLOCK_LEVEL
+		_transcendence_button.disabled = true
+	_transcendence_label.text = "transc.: %d" % GameState.transcendence_level
+
 func _process(delta: float) -> void:
 	if _gold_flash_remaining > 0.0:
 		_gold_flash_remaining = maxf(_gold_flash_remaining - delta, 0.0)
@@ -248,6 +293,8 @@ func _process(delta: float) -> void:
 			_apply_number_color()
 	_refresh_all_rows()
 	_refresh_prestige()
+	_refresh_ascension()
+	_refresh_transcendence()
 	# Cheater overlay stays visible while penalty active.
 	_cheater_overlay.visible = SaveSystem.is_cheater_active()
 
@@ -276,6 +323,17 @@ func _on_prestige_performed(level: int, quote: String) -> void:
 	_apply_number_color()
 	_refresh_all_rows()
 
+func _on_ascension_performed(level: int, quote: String) -> void:
+	_message_label.text = quote
+	_gold_flash_remaining = 1.5
+	_apply_number_color()
+	_refresh_all_rows()
+
+func _on_transcendence_performed(level: int, quote: String) -> void:
+	_message_label.text = quote
+	_apply_number_color()
+	_refresh_all_rows()
+
 func _on_message_emitted(text: String) -> void:
 	_message_label.text = text
 
@@ -294,6 +352,7 @@ func _on_click_area_input(event: InputEvent) -> void:
 
 func _do_click() -> void:
 	GameState.click()
+	SteamIntegration.on_click()
 	var value := GameState.click_value()
 	_spawn_floating_text("+" + NumberFormatter.format(value, GameState.settings["notation"]))
 
@@ -303,6 +362,12 @@ func _on_buy(id: String) -> void:
 func _on_prestige_pressed() -> void:
 	GameState.prestige()
 
+func _on_ascension_pressed() -> void:
+	GameState.ascend()
+
+func _on_transcendence_pressed() -> void:
+	GameState.transcend()
+
 # --- Color / corruption -----------------------------------------------------
 func _apply_number_color() -> void:
 	if _gold_flash_remaining > 0.0:
@@ -310,6 +375,8 @@ func _apply_number_color() -> void:
 		return
 	if GameState.red_count >= 6:
 		_number_label.add_theme_color_override("font_color", COLOR_RED)
+	elif GameState.transcendence_level > 0:
+		_number_label.add_theme_color_override("font_color", GameState.transcendence_color())
 	else:
 		_number_label.add_theme_color_override("font_color", COLOR_GREEN)
 

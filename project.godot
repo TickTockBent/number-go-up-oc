@@ -16,6 +16,7 @@ config/icon="res://icon.svg"
 GameState="*res://src/autoload/GameState.gd"
 SaveSystem="*res://src/autoload/SaveSystem.gd"
 FunnyNumbers="*res://src/autoload/FunnyNumbers.gd"
+SteamIntegration="*res://src/autoload/SteamIntegration.gd"
 
 [display]
 

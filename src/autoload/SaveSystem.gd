@@ -73,12 +73,15 @@ func save_game() -> void:
 	GameState.last_seen_unix = Time.get_unix_time_from_system()
 	var data: Dictionary = GameState.serialize()
 	data["_checksum"] = _checksum(data)
+	var text := JSON.stringify(data, "  ")
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		push_warning("SaveSystem: could not open save file for write.")
 		return
-	f.store_string(JSON.stringify(data, "  "))
+	f.store_string(text)
 	f.close()
+	# Sync to Steam Cloud when available (no-op if Steam isn't loaded).
+	SteamIntegration.cloud_write("number_go_up.save", text)
 
 func _checksum(data: Dictionary) -> String:
 	# Stable JSON (sorted keys) then SHA-256. Not security, just tamper detection.

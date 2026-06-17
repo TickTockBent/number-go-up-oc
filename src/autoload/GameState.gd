@@ -6,12 +6,17 @@ extends Node
 const TICK_HZ := 20.0
 const TICK_DT := 1.0 / TICK_HZ
 const PRESTIGE_UNLOCK := 10000.0
+const ASCENSION_UNLOCK_LEVEL := 10       # prestige levels required (GDD §6.2)
+const TRANSCENDENCE_UNLOCK_LEVEL := 5    # ascension levels required (GDD §6.3)
 const OFFLINE_CAP_SECONDS := 8 * 3600
+const TRANSCENDENCE_HUE_SHIFT_DEG := 30.0
 
 signal number_changed(number: float, total_earned: float)
 signal rate_changed(rate_per_sec: float)
 signal upgrade_purchased(id: String, owned: int)
 signal prestige_performed(level: int, quote: String)
+signal ascension_performed(level: int, quote: String)
+signal transcendence_performed(level: int, quote: String)
 signal message_emitted(text: String)
 signal offline_report(gained: float)
 signal red_corruption_changed(red_count: int)
@@ -36,7 +41,8 @@ var settings: Dictionary = {
 	"screen_shake": true,
 	"funny_popups": true,
 }
-var heavy_wallet: bool = false         # DLC; slice stub
+var heavy_wallet: bool = false         # DLC; set by SteamIntegration DLC detection
+var achievements_unlocked: Dictionary = {}  # api_id -> true (persisted across all resets)
 
 # --- Runtime ----------------------------------------------------------------
 var _accum: float = 0.0
@@ -201,6 +207,81 @@ const _PRESTIGE_QUOTES: Array = [
 func _prestige_quote() -> String:
 	return _PRESTIGE_QUOTES[randi() % _PRESTIGE_QUOTES.size()]
 
+# --- Layer 2: Ascension (GDD §6.2) -----------------------------------------
+## Unlock at prestige level 10. Resets everything prestige resets, plus prestige
+## levels return to 0. Slow penalty resets here (and only here, before transcendence).
+## Reward: x1.1 production per level (folded via ascension_mult).
+func can_ascend() -> bool:
+	return prestige_level >= ASCENSION_UNLOCK_LEVEL
+
+func ascend() -> void:
+	if not can_ascend():
+		return
+	ascension_level += 1
+	var quote := _ascension_quote()
+	# Layer-1 reset, then clear prestige levels and slow penalty.
+	_reset_run()
+	prestige_level = 0
+	slow_mult = 1.0
+	emit_signal("ascension_performed", ascension_level, quote)
+	_recompute_rate()
+
+const _ASCENSION_QUOTES: Array = [
+	"You have ascended beyond prestige. The number doesn't know what that means. It goes up.",
+	"Your prestiges are gone. You are left with a multiplier and a sense of loss.",
+	"Ascension complete. The meta-number acknowledges you.",
+	"The number goes up faster now, but at what cost? Exactly 0 cost. Ascension is free.",
+	"You reset the reset. The number respects the recursion.",
+]
+
+func _ascension_quote() -> String:
+	return _ASCENSION_QUOTES[randi() % _ASCENSION_QUOTES.size()]
+
+# --- Layer 3: Transcendence (GDD §6.3) -------------------------------------
+## Unlock at ascension level 5. Resets EVERYTHING except: transcendence counter,
+## funny number sightings, total clicks (achievement progress), settings, DLC.
+## Reward: +5% production per level + permanent hue shift of the number (30°/level).
+func can_transcend() -> bool:
+	return ascension_level >= TRANSCENDENCE_UNLOCK_LEVEL
+
+func transcend() -> void:
+	if not can_transcend():
+		return
+	transcendence_level += 1
+	var quote := _transcendence_quote()
+	# Full wipe. funny_sightings, total_clicks, settings, heavy_wallet persist.
+	number = 0.0
+	total_earned = 0.0
+	upgrades.clear()
+	prestige_level = 0
+	ascension_level = 0
+	slow_mult = 1.0
+	red_count = 0
+	mystery_count = 0
+	run_start_unix = Time.get_unix_time_from_system()
+	emit_signal("transcendence_performed", transcendence_level, quote)
+	_recompute_rate()
+
+const _TRANSCENDENCE_QUOTES: Array = [
+	"Up.", "Number.", "Again.", "Why.", "Up.", "Still.", "Here.", "Going.", "Up.",
+]
+
+func _transcendence_quote() -> String:
+	return _TRANSCENDENCE_QUOTES[randi() % _TRANSCENDENCE_QUOTES.size()]
+
+## Number color for the current transcendence level. Base green hue shifted 30°
+## per level; at level 12 the hue wraps back to green (GDD §6.3).
+const _BASE_NUMBER_COLOR := Color("#44ff88")
+func transcendence_color() -> Color:
+	if transcendence_level == 0:
+		return _BASE_NUMBER_COLOR
+	var base_hue := _BASE_NUMBER_COLOR.h
+	var base_sat := _BASE_NUMBER_COLOR.s
+	var base_val := _BASE_NUMBER_COLOR.v
+	var shift := TRANSCENDENCE_HUE_SHIFT_DEG / 360.0 * float(transcendence_level)
+	var hue := fmod(base_hue + shift, 1.0)
+	return Color.from_hsv(hue, base_sat, base_val)
+
 # --- Cost / unlock helpers for UI ------------------------------------------
 func upgrade_cost(id: String) -> float:
 	return UpgradeDB.cost(id, upgrades.get(id, 0))
@@ -256,6 +337,7 @@ func serialize() -> Dictionary:
 		"last_seen_unix": last_seen_unix,
 		"settings": settings.duplicate(true),
 		"heavy_wallet": heavy_wallet,
+		"achievements_unlocked": achievements_unlocked.duplicate(true),
 		"version": 1,
 	}
 
@@ -275,4 +357,5 @@ func deserialize(data: Dictionary) -> void:
 	last_seen_unix = int(data.get("last_seen_unix", Time.get_unix_time_from_system()))
 	settings = data.get("settings", settings).duplicate(true)
 	heavy_wallet = bool(data.get("heavy_wallet", false))
+	achievements_unlocked = data.get("achievements_unlocked", {}).duplicate(true)
 	mark_rate_dirty()

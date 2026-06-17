@@ -7,6 +7,11 @@
 tools/Godot_v4.6.3-stable_linux.x86_64
 tools/*.zip
 
+# GodotSteam GDExtension binaries (compiled separately — see addons/godotsteam/INSTALL.md)
+addons/godotsteam/linux64/*.so
+addons/godotsteam/win64/*.dll
+addons/godotsteam/osx/*.dylib
+
 # OS junk
 .DS_Store
 Thumbs.db

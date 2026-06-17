@@ -21,6 +21,11 @@ func _ready() -> void:
 	_test_rate_and_mult()
 	_test_slow_persists_through_prestige()
 	_test_mystery_hidden_bonus()
+	_test_ascension()
+	_test_transcendence()
+	_test_transcendence_color()
+	_test_achievements()
+	_test_steam_integration_degrades()
 	_test_save_roundtrip()
 	print("=== results: %d passed, %d failed ===" % [_passed, _failed])
 	get_tree().quit(0 if _failed == 0 else 1)
@@ -155,6 +160,134 @@ func _test_mystery_hidden_bonus() -> void:
 		_grant_buy("mystery")
 	GameState.mark_rate_dirty()
 	_ok(absf(GameState.effective_rate() - rate_before_any * pow(1.00777, 2)) < 0.001, "14th mystery: 2nd hidden bonus")
+
+func _test_ascension() -> void:
+	print("[ascension]")
+	_reset_state()
+	_ok(not GameState.can_ascend(), "cannot ascend at prestige 0")
+	GameState.prestige_level = GameState.ASCENSION_UNLOCK_LEVEL
+	_ok(GameState.can_ascend(), "can ascend at prestige 10")
+	# Apply a slow penalty — ascension should clear it.
+	GameState.slow_mult = 0.5
+	GameState.red_count = 3
+	GameState.mystery_count = 2
+	GameState.ascend()
+	_ok(GameState.ascension_level == 1, "ascension level 1")
+	_ok(GameState.prestige_level == 0, "prestige reset to 0 on ascension")
+	_ok(absf(GameState.slow_mult - 1.0) < 0.001, "slow_mult resets on ascension")
+	_ok(GameState.red_count == 0, "red_count resets on ascension")
+	_ok(GameState.mystery_count == 0, "mystery_count resets on ascension")
+	_ok(GameState.upgrades.is_empty(), "upgrades cleared on ascension")
+	# x1.1 production multiplier per level.
+	_ok(absf(GameState.ascension_mult() - 1.1) < 0.001, "ascension_mult = 1.1")
+	GameState.ascension_level = 3
+	_ok(absf(GameState.ascension_mult() - pow(1.1, 3)) < 0.001, "ascension_mult = 1.1^3")
+	# Ascension multiplier folds into production_mult.
+	_reset_state()
+	GameState.ascension_level = 2
+	GameState.mark_rate_dirty()
+	_ok(absf(GameState.production_mult() - pow(1.1, 2)) < 0.001, "production_mult includes ascension")
+	# Cannot ascend without enough prestige.
+	_reset_state()
+	GameState.prestige_level = GameState.ASCENSION_UNLOCK_LEVEL - 1
+	_ok(not GameState.can_ascend(), "cannot ascend at prestige 9")
+
+func _test_transcendence() -> void:
+	print("[transcendence]")
+	_reset_state()
+	_ok(not GameState.can_transcend(), "cannot transcend at ascension 0")
+	GameState.ascension_level = GameState.TRANSCENDENCE_UNLOCK_LEVEL
+	_ok(GameState.can_transcend(), "can transcend at ascension 5")
+	# Set up state that should be wiped.
+	GameState.prestige_level = 7
+	GameState.ascension_level = GameState.TRANSCENDENCE_UNLOCK_LEVEL
+	GameState.slow_mult = 0.3
+	GameState.red_count = 20
+	GameState.mystery_count = 14
+	GameState.number = 999999.0
+	GameState.total_earned = 999999.0
+	GameState.funny_sightings = {"69": 3, "420": 1}
+	GameState.total_clicks = 500
+	_grant_buy("auto_1")
+	GameState.transcend()
+	_ok(GameState.transcendence_level == 1, "transcendence level 1")
+	_ok(GameState.number == 0.0, "number wiped on transcendence")
+	_ok(GameState.total_earned == 0.0, "total_earned wiped on transcendence")
+	_ok(GameState.prestige_level == 0, "prestige wiped on transcendence")
+	_ok(GameState.ascension_level == 0, "ascension wiped on transcendence")
+	_ok(GameState.upgrades.is_empty(), "upgrades wiped on transcendence")
+	_ok(absf(GameState.slow_mult - 1.0) < 0.001, "slow_mult wiped on transcendence")
+	_ok(GameState.red_count == 0, "red_count wiped on transcendence")
+	_ok(GameState.mystery_count == 0, "mystery_count wiped on transcendence")
+	# Persistence exceptions.
+	_ok(GameState.funny_sightings.get("69", 0) == 3, "funny_sightings PERSIST through transcendence")
+	_ok(GameState.total_clicks == 500, "total_clicks PERSIST through transcendence")
+	# +5% production per level.
+	_ok(absf(GameState.transcendence_mult() - 1.05) < 0.001, "transcendence_mult = 1.05")
+	GameState.transcendence_level = 4
+	_ok(absf(GameState.transcendence_mult() - 1.20) < 0.001, "transcendence_mult = 1.20 at level 4")
+
+func _test_transcendence_color() -> void:
+	print("[transcendence color]")
+	_reset_state()
+	var base := GameState.transcendence_color()
+	_ok(absf(base.r - Color("#44ff88").r) < 0.001 and absf(base.g - Color("#44ff88").g) < 0.001, "level 0 = base green")
+	# Level 12 wraps back to green (360° / 30° = 12).
+	GameState.transcendence_level = 12
+	var wrapped := GameState.transcendence_color()
+	_ok(absf(wrapped.r - base.r) < 0.01 and absf(wrapped.g - base.g) < 0.01 and absf(wrapped.b - base.b) < 0.01, "level 12 wraps back to green")
+	# Level 6 is a distinct hue (180° from base).
+	GameState.transcendence_level = 6
+	var mid := GameState.transcendence_color()
+	_ok(absf(mid.r - base.r) > 0.05 or absf(mid.g - base.g) > 0.05 or absf(mid.b - base.b) > 0.05, "level 6 differs from base")
+
+func _test_achievements() -> void:
+	print("[achievements]")
+	_reset_state()
+	GameState.achievements_unlocked.clear()
+	SteamIntegration._unlocked.clear()
+	# Count — should be 60 defined (GDD says 67, chosen deliberately).
+	_ok(AchievementsDB.count() == 60, "60 achievements defined (GDD target: 67)")
+	# Progression achievements fire on total_earned.
+	GameState.total_earned = 1.0
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_FIRST_NUMBER"), "first number achievement")
+	GameState.total_earned = 1000000.0
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_MILLIONAIRE"), "millionaire achievement")
+	# Red button achievements.
+	GameState.red_count = 10
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_RED_ENTHUSIAST"), "red enthusiast at 10")
+	# Funny number sighting achievements.
+	GameState.funny_sightings["69"] = 1
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_NICE"), "nice achievement on 69 sighting")
+	# Mystery achievement.
+	GameState.mystery_count = 49
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_THE_SECRET"), "the secret at 49 mystery")
+	# Two buttons — owns both slow and anti_slow.
+	_reset_state()
+	GameState.achievements_unlocked.clear()
+	SteamIntegration._unlocked.clear()
+	GameState.upgrades["slow"] = 1
+	GameState.upgrades["anti_slow"] = 1
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_TWO_BUTTONS"), "two buttons achievement")
+	# Achievements persist to GameState.achievements_unlocked.
+	_ok(GameState.achievements_unlocked.has("NGU_TWO_BUTTONS"), "achievement stored in GameState")
+
+func _test_steam_integration_degrades() -> void:
+	print("[steam degradation]")
+	# Without the godot-steam GDExtension loaded, steam_available must be false.
+	_ok(not SteamIntegration.steam_available, "steam_available is false in headless/no-GDExtension mode")
+	# Methods should no-op without errors.
+	SteamIntegration.unlock("NGU_TEST_NOOP")
+	_ok(SteamIntegration.is_unlocked("NGU_TEST_NOOP"), "unlock works in offline mode (local cache)")
+	# Cloud read/write should return empty/false without Steam.
+	_ok(SteamIntegration.cloud_read("nonexistent.save") == "", "cloud_read returns empty without Steam")
+	_ok(not SteamIntegration.cloud_exists("nonexistent.save"), "cloud_exists returns false without Steam")
 
 func _test_save_roundtrip() -> void:
 	print("[save roundtrip]")
