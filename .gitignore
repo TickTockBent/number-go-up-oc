@@ -1,0 +1,17 @@
+# Godot import cache
+.godot/
+
+# Engine binary is too large for git (>100MB GitHub limit).
+# Download Godot 4.6.3 stable into tools/ separately:
+#   https://github.com/godotengine/godot/releases/download/4.6.3-stable/Godot_v4.6.3-stable_linux.x86_64
+tools/Godot_v4.6.3-stable_linux.x86_64
+tools/*.zip
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor swaps
+*.swp
+*.swo
+*~
