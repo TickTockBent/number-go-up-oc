@@ -50,6 +50,7 @@ var settings: Dictionary = {
 var heavy_wallet: bool = false         # DLC; set by SteamIntegration DLC detection
 var heavy_wallet_acknowledged: bool = false  # player has dismissed the ACCEPT YOUR FATE overlay
 var achievements_unlocked: Dictionary = {}  # api_id -> true (persisted across all resets)
+var last_prestige_number: int = 0           # floored number before last prestige (for "Full Circle")
 
 # --- Runtime ----------------------------------------------------------------
 var _accum: float = 0.0
@@ -184,6 +185,7 @@ func can_prestige() -> bool:
 func prestige() -> void:
 	if not can_prestige():
 		return
+	last_prestige_number = int(floor(number))
 	prestige_level += 1
 	var quote := _prestige_quote()
 	_reset_run()
@@ -265,6 +267,7 @@ func transcend() -> void:
 	slow_mult = 1.0
 	red_count = 0
 	mystery_count = 0
+	last_prestige_number = 0
 	run_start_unix = Time.get_unix_time_from_system()
 	emit_signal("transcendence_performed", transcendence_level, quote)
 	_recompute_rate()
@@ -346,6 +349,7 @@ func serialize() -> Dictionary:
 		"heavy_wallet": heavy_wallet,
 		"heavy_wallet_acknowledged": heavy_wallet_acknowledged,
 		"achievements_unlocked": achievements_unlocked.duplicate(true),
+		"last_prestige_number": last_prestige_number,
 		"version": 1,
 	}
 
@@ -371,4 +375,5 @@ func deserialize(data: Dictionary) -> void:
 	heavy_wallet = bool(data.get("heavy_wallet", false))
 	heavy_wallet_acknowledged = bool(data.get("heavy_wallet_acknowledged", false))
 	achievements_unlocked = data.get("achievements_unlocked", {}).duplicate(true)
+	last_prestige_number = int(data.get("last_prestige_number", 0))
 	mark_rate_dirty()

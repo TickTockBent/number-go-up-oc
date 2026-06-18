@@ -73,7 +73,12 @@ const ACHIEVEMENTS: Array = [
 	{"api_id": "NGU_SPEEDRUN", "name": "Speedrun", "desc": "Reached 1 million in under 5 minutes.", "hidden": true, "category": Category.META},
 	{"api_id": "NGU_FULL_EXPERIENCE", "name": "The Full Experience", "desc": "Bought every unique upgrade type at least once.", "hidden": true, "category": Category.META},
 	{"api_id": "NGU_YOU_WIN", "name": "You Win?", "desc": "You set the number to infinity. Is this winning? The number can't go up from here. You broke the one thing the game does.", "hidden": true, "category": Category.META},
-	{"api_id": "NGU_67_ACHIEVEMENTS", "name": "67 Achievements", "desc": "You've unlocked all 67 achievements. That number was chosen on purpose.", "hidden": true, "category": Category.META},
+	# --- §10.6 Workshop + behavioral polish (4) ---
+	{"api_id": "NGU_NOT_OUR_PROBLEM", "name": "NOT OUR PROBLEM", "desc": "Enabled a Workshop pack. We are not responsible for what happens next.", "hidden": false, "category": Category.META},
+	{"api_id": "NGU_LIAR", "name": "Liar", "desc": "Changed notation mode 10 times in a single session. The number saw everything.", "hidden": true, "category": Category.META},
+	{"api_id": "NGU_THE_PRESTIGE_PRESTIGE", "name": "The Prestige Prestige", "desc": "Prestiged within 5 seconds of loading the game. The number didn't even get comfortable.", "hidden": true, "category": Category.PRESTIGE},
+	{"api_id": "NGU_FULL_CIRCLE", "name": "Full Circle", "desc": "Reached the exact same number you had before your last prestige. The number has returned home.", "hidden": true, "category": Category.META},
+	{"api_id": "NGU_67_ACHIEVEMENTS", "name": "67", "desc": "You've unlocked all 67 achievements. That number was chosen on purpose.", "hidden": true, "category": Category.META},
 ]
 
 ## Total count (should be 67 per GDD — the number is deliberate).

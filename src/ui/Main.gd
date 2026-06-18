@@ -1132,6 +1132,7 @@ func _on_notation_changed(index: int) -> void:
 		1: GameState.settings["notation"] = "extended"
 		2: GameState.settings["notation"] = "unhinged"
 		3: GameState.settings["notation"] = "nerd"
+	SteamIntegration.notify_notation_changed()
 	GameState.mark_rate_dirty()
 	_apply_number_color()
 

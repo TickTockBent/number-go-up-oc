@@ -18,6 +18,7 @@ var _idle_seconds: float = 0.0
 var _last_click_unix: int = 0
 var _stats_tab_open_seconds: float = 0.0
 var _run_start_unix: int = 0
+var _notation_changes: int = 0
 
 func _ready() -> void:
 	_run_start_unix = Time.get_unix_time_from_system()
@@ -156,6 +157,10 @@ func _evaluate_condition(api_id: String) -> bool:
 		"NGU_SPEEDRUN": return GameState.total_earned >= 1000000.0 and _run_elapsed() < 300.0
 		"NGU_FULL_EXPERIENCE": return _owns_all_upgrade_types()
 		"NGU_YOU_WIN": return is_inf(GameState.number)
+		"NGU_NOT_OUR_PROBLEM": return WorkshopManager.player_toggled_pack and WorkshopManager.get_enabled_count() > 0
+		"NGU_LIAR": return _notation_changes >= 10
+		"NGU_THE_PRESTIGE_PRESTIGE": return false  # Evaluated at prestige moment via check_prestige_speed()
+		"NGU_FULL_CIRCLE": return GameState.last_prestige_number > 0 and int(floor(GameState.number)) == GameState.last_prestige_number
 		"NGU_67_ACHIEVEMENTS": return _all_others_unlocked(api_id)
 		_: return false
 
@@ -230,6 +235,8 @@ func check_prestige_speed() -> void:
 	var run_time: float = float(Time.get_unix_time_from_system() - GameState.run_start_unix)
 	if run_time < 60.0 and GameState.prestige_level >= 1:
 		unlock("NGU_PRESTIGE_60S")
+	if run_time < 5.0 and GameState.prestige_level >= 1:
+		unlock("NGU_THE_PRESTIGE_PRESTIGE")
 
 func check_offline_return(offline_seconds: float) -> void:
 	if offline_seconds >= float(GameState.OFFLINE_CAP_SECONDS):
@@ -249,6 +256,11 @@ func notify_stats_tab_open(delta: float) -> void:
 
 func reset_stats_tab_timer() -> void:
 	_stats_tab_open_seconds = 0.0
+
+func notify_notation_changed() -> void:
+	_notation_changes += 1
+	if _notation_changes >= 10:
+		unlock("NGU_LIAR")
 
 # --- Idle tracking ----------------------------------------------------------
 func _track_idle(delta: float) -> void:

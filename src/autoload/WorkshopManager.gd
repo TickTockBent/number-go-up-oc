@@ -22,6 +22,7 @@ const PACKS_DIR := "user://packs"             # local packs
 const WORKSHOP_DIR := "user://workshop"       # Steam-downloaded packs
 
 var _packs: Array = []                        # [{path, manifest, enabled, source}]
+var player_toggled_pack: bool = false          # set when player manually toggles a pack
 var _popup_cache: Dictionary = {}             # pattern -> Texture2D or VideoStream
 var _sound_cache: Dictionary = {}             # event_id -> AudioStream
 var _texture_cache: Dictionary = {}           # texture_id -> Texture2D
@@ -91,6 +92,7 @@ func set_pack_enabled(folder_name: String, enabled: bool) -> void:
 	for pack in _packs:
 		if pack.folder_name == folder_name:
 			pack.enabled = enabled
+			player_toggled_pack = true
 			_clear_caches()
 			emit_signal("packs_changed")
 			return

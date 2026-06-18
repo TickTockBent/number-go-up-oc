@@ -54,6 +54,7 @@ func _reset_state() -> void:
 	GameState.mystery_count = 0
 	GameState.funny_sightings.clear()
 	GameState.total_clicks = 0
+	GameState.last_prestige_number = 0
 	GameState.mark_rate_dirty()
 
 ## Grant effectively-infinite funds and buy, so tests can focus on mechanics.
@@ -250,8 +251,8 @@ func _test_achievements() -> void:
 	_reset_state()
 	GameState.achievements_unlocked.clear()
 	SteamIntegration._unlocked.clear()
-	# Count — should be 60 defined (GDD says 67, chosen deliberately).
-	_ok(AchievementsDB.count() == 61, "61 achievements defined (GDD target: 67)")
+	# Count — should be 65 defined (GDD says 67, chosen deliberately; 2 remaining TBD).
+	_ok(AchievementsDB.count() == 65, "65 achievements defined (GDD target: 67; 2 remaining)")
 	# Progression achievements fire on total_earned.
 	GameState.total_earned = 1.0
 	SteamIntegration.evaluate_all()
@@ -290,6 +291,66 @@ func _test_achievements() -> void:
 	SteamIntegration.evaluate_all()
 	_ok(SteamIntegration.is_unlocked("NGU_YOU_WIN"), "You Win? achievement on infinity")
 	_ok(FMT.format(INF, "extended") == "Infinity", "formatter shows Infinity")
+
+	# "NOT OUR PROBLEM" — enabled a Workshop pack
+	_reset_state()
+	GameState.achievements_unlocked.clear()
+	SteamIntegration._unlocked.clear()
+	WorkshopManager._packs.clear()
+	WorkshopManager.player_toggled_pack = false
+	SteamIntegration.evaluate_all()
+	_ok(not SteamIntegration.is_unlocked("NGU_NOT_OUR_PROBLEM"), "no pack achievement without toggle")
+	var _wp_manifest: Dictionary = {"name": "T", "author": "t", "version": "1", "priority": 50}
+	WorkshopManager.create_local_pack("_ach_test_pack", _wp_manifest)
+	WorkshopManager.set_pack_enabled("_ach_test_pack", true)
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_NOT_OUR_PROBLEM"), "NOT OUR PROBLEM after enabling pack")
+	# Cleanup
+	var _wp_dir := DirAccess.open(WorkshopManager.PACKS_DIR)
+	if _wp_dir != null:
+		_wp_dir.remove("_ach_test_pack/pack.json")
+		_wp_dir.remove("_ach_test_pack")
+	WorkshopManager.player_toggled_pack = false
+	WorkshopManager.scan_packs()
+
+	# "Liar" — changed notation 10 times
+	_reset_state()
+	GameState.achievements_unlocked.clear()
+	SteamIntegration._unlocked.clear()
+	SteamIntegration._notation_changes = 0
+	for i in range(9):
+		SteamIntegration.notify_notation_changed()
+	SteamIntegration.evaluate_all()
+	_ok(not SteamIntegration.is_unlocked("NGU_LIAR"), "no Liar at 9 changes")
+	SteamIntegration.notify_notation_changed()
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_LIAR"), "Liar at 10 notation changes")
+	SteamIntegration._notation_changes = 0
+
+	# "The Prestige Prestige" — prestige within 5 seconds
+	_reset_state()
+	GameState.achievements_unlocked.clear()
+	SteamIntegration._unlocked.clear()
+	GameState.total_earned = 50000.0
+	GameState.run_start_unix = Time.get_unix_time_from_system()  # just now
+	GameState.prestige()
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_THE_PRESTIGE_PRESTIGE"), "The Prestige Prestige within 5s")
+
+	# "Full Circle" — reach same number as before prestige
+	_reset_state()
+	GameState.achievements_unlocked.clear()
+	SteamIntegration._unlocked.clear()
+	GameState.total_earned = 50000.0
+	GameState.number = 50000.0
+	GameState.prestige()
+	_ok(GameState.last_prestige_number == 50000, "last_prestige_number stored")
+	GameState.number = 49999.0
+	SteamIntegration.evaluate_all()
+	_ok(not SteamIntegration.is_unlocked("NGU_FULL_CIRCLE"), "no Full Circle at wrong number")
+	GameState.number = 50000.0
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_FULL_CIRCLE"), "Full Circle at exact number")
 
 func _test_steam_integration_degrades() -> void:
 	print("[steam degradation]")
