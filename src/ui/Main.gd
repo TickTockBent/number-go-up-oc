@@ -79,6 +79,7 @@ func _ready() -> void:
 	GameState.transcendence_performed.connect(_on_transcendence_performed)
 	GameState.message_emitted.connect(_on_message_emitted)
 	GameState.red_corruption_changed.connect(_on_red_corruption_changed)
+	GameState.offline_report.connect(_on_offline_report)
 	FunnyNumbers.popup_fired.connect(_on_funny_popup)
 	SaveSystem.cheater_detected.connect(_show_cheater)
 	SteamIntegration.dlc_status_changed.connect(_on_dlc_changed)
@@ -852,17 +853,20 @@ func _on_prestige_performed(level: int, quote: String) -> void:
 	_gold_flash_remaining = 1.0
 	_apply_number_color()
 	_refresh_all_rows()
+	AudioManager.on_prestige()
 
 func _on_ascension_performed(level: int, quote: String) -> void:
 	_message_label.text = quote
 	_gold_flash_remaining = 1.5
 	_apply_number_color()
 	_refresh_all_rows()
+	AudioManager.on_ascension()
 
 func _on_transcendence_performed(level: int, quote: String) -> void:
 	_message_label.text = quote
 	_apply_number_color()
 	_refresh_all_rows()
+	AudioManager.on_transcendence()
 
 func _on_message_emitted(text: String) -> void:
 	_message_label.text = text
@@ -873,9 +877,13 @@ func _on_red_corruption_changed(red_count: int) -> void:
 
 func _on_funny_popup(entry: Dictionary) -> void:
 	_spawn_funny_popup(entry)
+	AudioManager.play_stinger(entry.pattern)
 
 func _on_dlc_changed(_active: bool) -> void:
 	_check_heavy_wallet()
+
+func _on_offline_report(_gained: float) -> void:
+	AudioManager.on_offline_return()
 
 # --- Input ------------------------------------------------------------------
 func _on_click_area_input(event: InputEvent) -> void:
@@ -890,9 +898,16 @@ func _do_click() -> void:
 	var value := GameState.click_value()
 	_spawn_floating_text("+" + NumberFormatter.format(value, GameState.settings["notation"]))
 	_trigger_shake(value)
+	AudioManager.play_sfx("click")
 
 func _on_buy(id: String) -> void:
 	GameState.buy(id)
+	# SFX: red/slow/mystery have special sounds; everything else uses buy.
+	match id:
+		"red": AudioManager.play_sfx("buy_red")
+		"slow": AudioManager.play_sfx("buy_slow")
+		"mystery": AudioManager.play_sfx("buy_mystery")
+		_: AudioManager.play_sfx("buy")
 
 func _on_prestige_pressed() -> void:
 	GameState.prestige()
@@ -928,6 +943,7 @@ func _on_toggle_changed(pressed: bool, settings_key: String) -> void:
 
 func _on_volume_changed(value: float, settings_key: String) -> void:
 	GameState.settings[settings_key] = value
+	AudioManager.update_volumes_from_settings()
 
 func _on_color_hue_changed(value: float) -> void:
 	GameState.settings["color_override_hue"] = value

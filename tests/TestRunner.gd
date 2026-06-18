@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_steam_integration_degrades()
 	_test_save_roundtrip()
 	_test_settings_roundtrip()
+	_test_audio_system()
 	print("=== results: %d passed, %d failed ===" % [_passed, _failed])
 	get_tree().quit(0 if _failed == 0 else 1)
 
@@ -347,3 +348,32 @@ func _test_settings_roundtrip() -> void:
 	GameState.settings["screen_shake"] = false
 	GameState.deserialize(GameState.serialize())
 	_ok(GameState.settings["screen_shake"] == "off", "old bool screen_shake=false migrates to 'off'")
+
+func _test_audio_system() -> void:
+	print("[audio]")
+	# AudioManager should be initialized (headless still generates streams).
+	_ok(AudioManager._audio_initialized, "AudioManager initialized")
+	# SFX cache should have entries for all expected events.
+	_ok(AudioManager._sfx.has("click"), "click SFX generated")
+	_ok(AudioManager._sfx.has("buy"), "buy SFX generated")
+	_ok(AudioManager._sfx.has("prestige"), "prestige SFX generated")
+	_ok(AudioManager._sfx.has("transcendence"), "transcendence SFX generated")
+	# Stinger cache should have special-case patterns.
+	_ok(AudioManager._stingers.has("69"), "69 stinger generated")
+	_ok(AudioManager._stingers.has("9001"), "9001 stinger generated")
+	_ok(AudioManager._stingers.has("666"), "666 stinger generated")
+	_ok(AudioManager._stingers.has("2319"), "2319 stinger generated")
+	# Music stems — 4 players.
+	_ok(AudioManager._stem_players.size() == 4, "4 music stems created")
+	# Buses should exist.
+	_ok(AudioServer.get_bus_index("Master") != -1, "Master bus exists")
+	_ok(AudioServer.get_bus_index("Music") != -1, "Music bus exists")
+	_ok(AudioServer.get_bus_index("SFX") != -1, "SFX bus exists")
+	_ok(AudioServer.get_bus_index("Stinger") != -1, "Stinger bus exists")
+	# play_sfx/play_stinger should not crash in headless mode.
+	AudioManager.play_sfx("click")
+	AudioManager.play_stinger("69")
+	_ok(true, "play_sfx/play_stinger don't crash in headless")
+	# Post-prestige cut should work.
+	AudioManager.trigger_post_prestige_cut()
+	_ok(AudioManager._post_prestige_cut_remaining > 0.0, "post-prestige cut triggered")
