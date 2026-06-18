@@ -38,10 +38,17 @@ var last_seen_unix: int = 0
 var settings: Dictionary = {
 	"notation": "extended",            # normal | extended | unhinged | nerd
 	"offline": true,
-	"screen_shake": true,
+	"screen_shake": "on",              # off | on | maximum (GDD §13.1)
 	"funny_popups": true,
+	"master_volume": 1.0,
+	"music_volume": 0.8,
+	"sfx_volume": 1.0,
+	"stinger_volume": 1.0,
+	"color_override_enabled": false,   # locked unless 1+ transcendence (GDD §13.1)
+	"color_override_hue": 0.0,         # 0.0-1.0 HSV hue
 }
 var heavy_wallet: bool = false         # DLC; set by SteamIntegration DLC detection
+var heavy_wallet_acknowledged: bool = false  # player has dismissed the ACCEPT YOUR FATE overlay
 var achievements_unlocked: Dictionary = {}  # api_id -> true (persisted across all resets)
 
 # --- Runtime ----------------------------------------------------------------
@@ -337,6 +344,7 @@ func serialize() -> Dictionary:
 		"last_seen_unix": last_seen_unix,
 		"settings": settings.duplicate(true),
 		"heavy_wallet": heavy_wallet,
+		"heavy_wallet_acknowledged": heavy_wallet_acknowledged,
 		"achievements_unlocked": achievements_unlocked.duplicate(true),
 		"version": 1,
 	}
@@ -356,6 +364,11 @@ func deserialize(data: Dictionary) -> void:
 	run_start_unix = int(data.get("run_start_unix", Time.get_unix_time_from_system()))
 	last_seen_unix = int(data.get("last_seen_unix", Time.get_unix_time_from_system()))
 	settings = data.get("settings", settings).duplicate(true)
+	# Migrate screen_shake from old bool format to string.
+	var ss: Variant = settings.get("screen_shake", "on")
+	if ss is bool:
+		settings["screen_shake"] = "on" if ss else "off"
 	heavy_wallet = bool(data.get("heavy_wallet", false))
+	heavy_wallet_acknowledged = bool(data.get("heavy_wallet_acknowledged", false))
 	achievements_unlocked = data.get("achievements_unlocked", {}).duplicate(true)
 	mark_rate_dirty()

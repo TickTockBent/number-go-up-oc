@@ -72,6 +72,7 @@ const ACHIEVEMENTS: Array = [
 	{"api_id": "NGU_TWO_BUTTONS", "name": "Two Buttons", "desc": "Bought both the slower button and the faster button. The net effect is almost nothing.", "hidden": true, "category": Category.META},
 	{"api_id": "NGU_SPEEDRUN", "name": "Speedrun", "desc": "Reached 1 million in under 5 minutes.", "hidden": true, "category": Category.META},
 	{"api_id": "NGU_FULL_EXPERIENCE", "name": "The Full Experience", "desc": "Bought every unique upgrade type at least once.", "hidden": true, "category": Category.META},
+	{"api_id": "NGU_YOU_WIN", "name": "You Win?", "desc": "You set the number to infinity. Is this winning? The number can't go up from here. You broke the one thing the game does.", "hidden": true, "category": Category.META},
 	{"api_id": "NGU_67_ACHIEVEMENTS", "name": "67 Achievements", "desc": "You've unlocked all 67 achievements. That number was chosen on purpose.", "hidden": true, "category": Category.META},
 ]
 

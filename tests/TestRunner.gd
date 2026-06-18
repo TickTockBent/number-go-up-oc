@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_achievements()
 	_test_steam_integration_degrades()
 	_test_save_roundtrip()
+	_test_settings_roundtrip()
 	print("=== results: %d passed, %d failed ===" % [_passed, _failed])
 	get_tree().quit(0 if _failed == 0 else 1)
 
@@ -247,7 +248,7 @@ func _test_achievements() -> void:
 	GameState.achievements_unlocked.clear()
 	SteamIntegration._unlocked.clear()
 	# Count — should be 60 defined (GDD says 67, chosen deliberately).
-	_ok(AchievementsDB.count() == 60, "60 achievements defined (GDD target: 67)")
+	_ok(AchievementsDB.count() == 61, "61 achievements defined (GDD target: 67)")
 	# Progression achievements fire on total_earned.
 	GameState.total_earned = 1.0
 	SteamIntegration.evaluate_all()
@@ -277,6 +278,15 @@ func _test_achievements() -> void:
 	_ok(SteamIntegration.is_unlocked("NGU_TWO_BUTTONS"), "two buttons achievement")
 	# Achievements persist to GameState.achievements_unlocked.
 	_ok(GameState.achievements_unlocked.has("NGU_TWO_BUTTONS"), "achievement stored in GameState")
+
+	# "You Win?" — infinity edge case
+	_reset_state()
+	GameState.achievements_unlocked.clear()
+	SteamIntegration._unlocked.clear()
+	GameState.number = INF
+	SteamIntegration.evaluate_all()
+	_ok(SteamIntegration.is_unlocked("NGU_YOU_WIN"), "You Win? achievement on infinity")
+	_ok(FMT.format(INF, "extended") == "Infinity", "formatter shows Infinity")
 
 func _test_steam_integration_degrades() -> void:
 	print("[steam degradation]")
@@ -309,3 +319,31 @@ func _test_save_roundtrip() -> void:
 	_ok(GameState.prestige_level == 3, "prestige restored")
 	_ok(absf(GameState.slow_mult - 0.81) < 0.001, "slow_mult restored")
 	_ok(GameState.funny_sightings.get("69", 0) == 5, "funny sightings restored")
+
+func _test_settings_roundtrip() -> void:
+	print("[settings roundtrip]")
+	_reset_state()
+	GameState.settings["notation"] = "unhinged"
+	GameState.settings["screen_shake"] = "maximum"
+	GameState.settings["master_volume"] = 0.5
+	GameState.settings["color_override_enabled"] = true
+	GameState.settings["color_override_hue"] = 0.33
+	GameState.heavy_wallet_acknowledged = true
+	var snap: Dictionary = GameState.serialize()
+	snap.erase("_checksum")
+	_reset_state()
+	GameState.deserialize(snap)
+	_ok(GameState.settings["notation"] == "unhinged", "notation setting restored")
+	_ok(GameState.settings["screen_shake"] == "maximum", "screen_shake setting restored")
+	_ok(absf(float(GameState.settings["master_volume"]) - 0.5) < 0.01, "volume setting restored")
+	_ok(bool(GameState.settings["color_override_enabled"]) == true, "color override flag restored")
+	_ok(absf(float(GameState.settings["color_override_hue"]) - 0.33) < 0.01, "color override hue restored")
+	_ok(GameState.heavy_wallet_acknowledged == true, "heavy_wallet_acknowledged restored")
+	# Old bool screen_shake should migrate to "on"/"off".
+	_reset_state()
+	GameState.settings["screen_shake"] = true
+	GameState.deserialize(GameState.serialize())
+	_ok(GameState.settings["screen_shake"] == "on", "old bool screen_shake=true migrates to 'on'")
+	GameState.settings["screen_shake"] = false
+	GameState.deserialize(GameState.serialize())
+	_ok(GameState.settings["screen_shake"] == "off", "old bool screen_shake=false migrates to 'off'")

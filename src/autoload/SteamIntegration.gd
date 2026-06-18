@@ -155,6 +155,7 @@ func _evaluate_condition(api_id: String) -> bool:
 		"NGU_TWO_BUTTONS": return GameState.upgrade_owned("slow") >= 1 and GameState.upgrade_owned("anti_slow") >= 1
 		"NGU_SPEEDRUN": return GameState.total_earned >= 1000000.0 and _run_elapsed() < 300.0
 		"NGU_FULL_EXPERIENCE": return _owns_all_upgrade_types()
+		"NGU_YOU_WIN": return is_inf(GameState.number)
 		"NGU_67_ACHIEVEMENTS": return _all_others_unlocked(api_id)
 		_: return false
 

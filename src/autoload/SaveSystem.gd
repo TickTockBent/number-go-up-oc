@@ -57,17 +57,18 @@ func load_on_launch() -> Dictionary:
 
 	# Offline progress (only if not tampered — tamper runs the cheater path).
 	var elapsed := 0.0
+	var gained := 0.0
 	if not tampered and GameState.settings.get("offline", true):
 		var now := Time.get_unix_time_from_system()
 		elapsed = maxf(float(now - GameState.last_seen_unix), 0.0)
 		if elapsed > 1.0:
-			GameState.apply_offline_progress(elapsed)
+			gained = GameState.apply_offline_progress(elapsed)
 	GameState.last_seen_unix = Time.get_unix_time_from_system()
 
 	if tampered:
 		_trigger_cheater_penalty()
 
-	return {"loaded": true, "tampered": tampered, "offline_seconds": elapsed}
+	return {"loaded": true, "tampered": tampered, "offline_seconds": elapsed, "offline_gained": gained}
 
 func save_game() -> void:
 	GameState.last_seen_unix = Time.get_unix_time_from_system()
