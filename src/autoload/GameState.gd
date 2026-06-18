@@ -51,6 +51,7 @@ var heavy_wallet: bool = false         # DLC; set by SteamIntegration DLC detect
 var heavy_wallet_acknowledged: bool = false  # player has dismissed the ACCEPT YOUR FATE overlay
 var achievements_unlocked: Dictionary = {}  # api_id -> true (persisted across all resets)
 var last_prestige_number: int = 0           # floored number before last prestige (for "Full Circle")
+var slow_mult_before_last_purchase: float = 1.0  # captured before slow_mult update (for "SLOWER")
 
 # --- Runtime ----------------------------------------------------------------
 var _accum: float = 0.0
@@ -168,6 +169,7 @@ func buy(id: String) -> bool:
 			emit_signal("message_emitted", UpgradeDB.red_button_message(red_count))
 			emit_signal("red_corruption_changed", red_count)
 		"slow":
+			slow_mult_before_last_purchase = slow_mult
 			slow_mult *= 0.9
 			emit_signal("message_emitted", UpgradeDB.slow_message(1.0 - slow_mult))
 		"mystery":

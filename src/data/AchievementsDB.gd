@@ -78,6 +78,8 @@ const ACHIEVEMENTS: Array = [
 	{"api_id": "NGU_LIAR", "name": "Liar", "desc": "Changed notation mode 10 times in a single session. The number saw everything.", "hidden": true, "category": Category.META},
 	{"api_id": "NGU_THE_PRESTIGE_PRESTIGE", "name": "The Prestige Prestige", "desc": "Prestiged within 5 seconds of loading the game. The number didn't even get comfortable.", "hidden": true, "category": Category.PRESTIGE},
 	{"api_id": "NGU_FULL_CIRCLE", "name": "Full Circle", "desc": "Reached the exact same number you had before your last prestige. The number has returned home.", "hidden": true, "category": Category.META},
+	{"api_id": "NGU_TRUST_ISSUES", "name": "Trust Issues", "desc": "Clicked the number 1000 times while at 0 production rate. The number isn't going up on its own. Neither is your finger.", "hidden": true, "category": Category.META},
+	{"api_id": "NGU_SLOWER", "name": "SLOWER", "desc": "Bought a slow button when your slow_mult was already below 0.10. The number respects your commitment to suffering.", "hidden": true, "category": Category.TRAP},
 	{"api_id": "NGU_67_ACHIEVEMENTS", "name": "67", "desc": "You've unlocked all 67 achievements. That number was chosen on purpose.", "hidden": true, "category": Category.META},
 ]
 

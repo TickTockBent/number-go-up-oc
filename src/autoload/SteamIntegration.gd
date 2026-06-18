@@ -19,6 +19,7 @@ var _last_click_unix: int = 0
 var _stats_tab_open_seconds: float = 0.0
 var _run_start_unix: int = 0
 var _notation_changes: int = 0
+var _zero_rate_clicks: int = 0
 
 func _ready() -> void:
 	_run_start_unix = Time.get_unix_time_from_system()
@@ -161,6 +162,8 @@ func _evaluate_condition(api_id: String) -> bool:
 		"NGU_LIAR": return _notation_changes >= 10
 		"NGU_THE_PRESTIGE_PRESTIGE": return false  # Evaluated at prestige moment via check_prestige_speed()
 		"NGU_FULL_CIRCLE": return GameState.last_prestige_number > 0 and int(floor(GameState.number)) == GameState.last_prestige_number
+		"NGU_TRUST_ISSUES": return _zero_rate_clicks >= 1000
+		"NGU_SLOWER": return false  # Evaluated at purchase time via on_upgrade_purchased()
 		"NGU_67_ACHIEVEMENTS": return _all_others_unlocked(api_id)
 		_: return false
 
@@ -219,7 +222,9 @@ func on_number_changed() -> void:
 func on_funny_sighting(_pattern: String, _total: int) -> void:
 	evaluate_all()
 
-func on_upgrade_purchased(_id: String, _owned: int) -> void:
+func on_upgrade_purchased(id: String, _owned: int) -> void:
+	if id == "slow" and GameState.slow_mult_before_last_purchase < 0.10:
+		unlock("NGU_SLOWER")
 	evaluate_all()
 
 func on_prestige_performed(_level: int, _quote: String) -> void:
@@ -229,6 +234,10 @@ func on_prestige_performed(_level: int, _quote: String) -> void:
 func on_click() -> void:
 	_idle_seconds = 0.0
 	_last_click_unix = Time.get_unix_time_from_system()
+	if GameState.effective_rate() <= 0.0:
+		_zero_rate_clicks += 1
+		if _zero_rate_clicks >= 1000:
+			unlock("NGU_TRUST_ISSUES")
 	evaluate_all()
 
 func check_prestige_speed() -> void:

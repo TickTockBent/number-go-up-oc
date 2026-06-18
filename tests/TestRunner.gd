@@ -55,6 +55,7 @@ func _reset_state() -> void:
 	GameState.funny_sightings.clear()
 	GameState.total_clicks = 0
 	GameState.last_prestige_number = 0
+	GameState.slow_mult_before_last_purchase = 1.0
 	GameState.mark_rate_dirty()
 
 ## Grant effectively-infinite funds and buy, so tests can focus on mechanics.
@@ -251,8 +252,8 @@ func _test_achievements() -> void:
 	_reset_state()
 	GameState.achievements_unlocked.clear()
 	SteamIntegration._unlocked.clear()
-	# Count — should be 65 defined (GDD says 67, chosen deliberately; 2 remaining TBD).
-	_ok(AchievementsDB.count() == 65, "65 achievements defined (GDD target: 67; 2 remaining)")
+	# Count — should be 67 (GDD target, chosen deliberately).
+	_ok(AchievementsDB.count() == 67, "67 achievements defined (GDD target met)")
 	# Progression achievements fire on total_earned.
 	GameState.total_earned = 1.0
 	SteamIntegration.evaluate_all()
@@ -351,6 +352,34 @@ func _test_achievements() -> void:
 	GameState.number = 50000.0
 	SteamIntegration.evaluate_all()
 	_ok(SteamIntegration.is_unlocked("NGU_FULL_CIRCLE"), "Full Circle at exact number")
+
+	# "Trust Issues" — 1000 clicks at 0 production rate
+	_reset_state()
+	GameState.achievements_unlocked.clear()
+	SteamIntegration._unlocked.clear()
+	SteamIntegration._zero_rate_clicks = 0
+	for i in range(999):
+		SteamIntegration.on_click()
+	_ok(not SteamIntegration.is_unlocked("NGU_TRUST_ISSUES"), "no Trust Issues at 999 zero-rate clicks")
+	SteamIntegration.on_click()
+	_ok(SteamIntegration.is_unlocked("NGU_TRUST_ISSUES"), "Trust Issues at 1000 zero-rate clicks")
+	SteamIntegration._zero_rate_clicks = 0
+
+	# "SLOWER" — buy slow button when slow_mult already below 0.10
+	_reset_state()
+	GameState.achievements_unlocked.clear()
+	SteamIntegration._unlocked.clear()
+	GameState.number = 1e15
+	# Buy slow buttons until slow_mult drops below 0.10.
+	# 0.9^22 ≈ 0.0985 < 0.10, so 22 purchases puts us below 0.10.
+	for i in range(22):
+		GameState.buy("slow")
+	SteamIntegration._unlocked.erase("NGU_SLOWER")
+	GameState.achievements_unlocked.erase("NGU_SLOWER")
+	_ok(GameState.slow_mult < 0.10, "slow_mult below 0.10 after 22 slow purchases")
+	# Buying one more slow button while already below 0.10 should unlock SLOWER.
+	GameState.buy("slow")
+	_ok(SteamIntegration.is_unlocked("NGU_SLOWER"), "SLOWER unlocked when buying slow below 0.10")
 
 func _test_steam_integration_degrades() -> void:
 	print("[steam degradation]")
