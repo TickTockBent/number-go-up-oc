@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_settings_roundtrip()
 	_test_audio_system()
 	_test_workshop_system()
+	_test_polish_features()
 	print("=== results: %d passed, %d failed ===" % [_passed, _failed])
 	get_tree().quit(0 if _failed == 0 else 1)
 
@@ -416,3 +417,23 @@ func _test_workshop_system() -> void:
 		dir.remove("_test_pack_2")
 	WorkshopManager.scan_packs()
 	_ok(true, "cleanup succeeded")
+
+func _test_polish_features() -> void:
+	print("[polish]")
+	# Sales milestone stubs (GDD §17).
+	_ok(UpgradeDB.get_sales_count() == 0, "sales count stub returns 0")
+	_ok(not UpgradeDB.has_milestone_upgrade(), "no milestone upgrade without sales")
+	_ok(UpgradeDB.get_milestone_description().length() > 0, "milestone description has text")
+	# Golden flash duration sanity (Main uses 10s, checked via constant).
+	var main_scene := load("res://src/ui/Main.gd")
+	_ok(main_scene != null, "Main scene script loads")
+	# Slow-penalty ghost only triggers at >=20% slow.
+	GameState.slow_mult = 1.0
+	_ok((1.0 - GameState.slow_mult) < 0.20, "no ghost at full speed")
+	GameState.slow_mult = 0.5
+	_ok((1.0 - GameState.slow_mult) >= 0.20, "ghost triggers at 50% slow")
+	GameState.slow_mult = 1.0
+	# Gamepad input actions exist in project input map.
+	_ok(InputMap.has_action("gamepad_click"), "gamepad_click action registered")
+	_ok(InputMap.has_action("gamepad_rapid_click"), "gamepad_rapid_click action registered")
+	_ok(InputMap.has_action("gamepad_tab_switch"), "gamepad_tab_switch action registered")

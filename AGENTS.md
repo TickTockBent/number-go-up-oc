@@ -114,13 +114,30 @@ unlock state persists in `GameState.achievements_unlocked` (survives all resets)
 Done: number display + 4 notation modes, click + floating "+N", all 6 upgrade tiers
 (data complete; mechanics general), all 3 prestige layers (prestige/ascension/transcendence)
 with hue-shift color, save/load + checksum + CHEATER easter egg, funny-number detection
-+ popups, slow-button persistence, red-button corruption tint, offline progress (8h cap),
-mystery hidden bonus, Steam integration scaffold (achievements/DLC/cloud via godot-steam,
-graceful degradation), 60 achievements defined + evaluated.
++ popups, slow-button persistence, red-button corruption tint (6+ number, 20+ overlay,
+50+ everything red), Heavy Wallet DLC overlay + "ACCEPT YOUR FATE" screen, offline
+progress (8h cap) + toast, mystery hidden bonus, Steam integration scaffold
+(achievements/DLC/cloud via godot-steam, graceful degradation), 61 achievements defined
++ evaluated, screen shake (On/Off/MAXIMUM), TabContainer (Game/Stats/Cards/Settings/
+Workshop), full Settings UI (notation, shake, toggles, 4 volume sliders, color override
+at transcendence 1+), Stats tab (funny sightings w/ color swatches, "The Long Stare"
+tracking), Cards tab (8+1 card viewer, "Card Collector" achievement), full synthesized
+audio (AudioSynth + AudioManager: 4 adaptive music stems crossfaded by production rate,
+post-prestige 30s cut, red detune 20+/50+, 99% slow half-speed, SFX pool of 8, click
+pitch ±5%, funny-number stingers, Workshop sound overrides), Workshop integration
+(WorkshopManager: pack scanning/parsing, priority-sorted resolution for
+popups/sounds/textures/music, Steam Workshop API with graceful no-op, Workshop UI tab
+with enable/disable/reorder/browse, funny popup overrides for image/video/text), post-
+prestige golden flash (10s fading), slow-penalty ghost trailing effect (20%+ slow),
+Unhinged mode layout chaos (upgrade rows jitter), controller/Deck mapping (A=click,
+R-trigger=rapid click 10/s, L-trigger=tab switch), sales milestone upgrade stubs (§17).
 
-Not yet (later milestones): adaptive audio (GDD §12), controller/Deck mapping (§14),
-settings UI, "You Win?" infinity edge case, Steam trading cards (requires Steam partner
-config), remaining 7 achievements to reach the 67 target.
+Not yet (later milestones): real audio assets (synthesized placeholders in place),
+controller/Deck L4/R4 grip mappings (§14 — only A/RT/LT done), full accessibility
+suite (§13.3 — Reduced Motion, High Contrast, Screen Reader, Auto-Click, Colorblind),
+Steam trading cards (requires Steam partner config), remaining 6 achievements to reach
+the 67 target, godot-steam GDExtension binaries (scaffolding in place; must compile
+from source per `addons/godotsteam/INSTALL.md`).
 
 ## Conventions
 

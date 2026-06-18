@@ -37,6 +37,9 @@ var _shake_intensity: float = 0.0
 var _flicker_remaining: float = 0.0
 var _flicker_overlay: ColorRect
 var _base_position: Vector2 = Vector2.ZERO
+var _ghost_labels: Array = []  # trailing ghost digits for slow penalty
+var _ghost_spawn_timer: float = 0.0
+var _unhinged_chaos_timer: float = 0.0
 
 # --- Stats tab state --------------------------------------------------------
 var _stats_container: VBoxContainer
@@ -871,7 +874,9 @@ func _process(delta: float) -> void:
 	_update_toast(delta)
 	_update_shake(delta)
 	_update_flicker(delta)
-	_track_tab_activity(delta)
+	_update_slow_ghost(delta)
+	_process_rapid_click(delta)
+	_update_unhinged_chaos(delta)
 	# Cheater overlay stays visible while penalty active.
 	_cheater_overlay.visible = SaveSystem.is_cheater_active()
 
@@ -955,6 +960,31 @@ func _update_flicker(delta: float) -> void:
 	else:
 		_flicker_overlay.color.a = 0.0
 
+func _update_slow_ghost(delta: float) -> void:
+	# GDD §3.3: slow penalty active — subtle trailing ghost effect on digits.
+	var slow_penalty := 1.0 - GameState.slow_mult
+	if slow_penalty < 0.20:
+		_ghost_spawn_timer = 0.0
+		return
+	_ghost_spawn_timer += delta
+	var spawn_interval := lerpf(0.3, 0.08, slow_penalty)
+	if _ghost_spawn_timer < spawn_interval:
+		return
+	_ghost_spawn_timer = 0.0
+	# Spawn a faint ghost of the current number text.
+	var ghost := Label.new()
+	ghost.text = _number_label.text
+	ghost.horizontal_alignment = _number_label.horizontal_alignment
+	ghost.vertical_alignment = _number_label.vertical_alignment
+	ghost.set_anchors_preset(PRESET_FULL_RECT)
+	ghost.add_theme_font_size_override("font_size", _number_label.get_theme_font_size("font_size"))
+	ghost.add_theme_color_override("font_color", Color(0.4, 0.4, 0.4, 0.3))
+	ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.add_child(ghost)
+	var tween := create_tween()
+	tween.tween_property(ghost, "modulate:a", 0.0, 0.8)
+	tween.chain().tween_callback(ghost.queue_free)
+
 # --- Signal handlers --------------------------------------------------------
 func _on_number_changed(number: float, total: float) -> void:
 	if SaveSystem.is_cheater_active():
@@ -976,14 +1006,14 @@ func _on_upgrade_purchased(id: String, owned: int) -> void:
 
 func _on_prestige_performed(level: int, quote: String) -> void:
 	_message_label.text = quote
-	_gold_flash_remaining = 1.0
+	_gold_flash_remaining = 10.0
 	_apply_number_color()
 	_refresh_all_rows()
 	AudioManager.on_prestige()
 
 func _on_ascension_performed(level: int, quote: String) -> void:
 	_message_label.text = quote
-	_gold_flash_remaining = 1.5
+	_gold_flash_remaining = 10.0
 	_apply_number_color()
 	_refresh_all_rows()
 	AudioManager.on_ascension()
@@ -1016,6 +1046,54 @@ func _on_click_area_input(event: InputEvent) -> void:
 		_do_click()
 	elif event.is_action_pressed("click"):
 		_do_click()
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Controller/Deck mapping (GDD §14).
+	if event.is_action_pressed("gamepad_click"):
+		_do_click()
+	elif event.is_action_pressed("gamepad_tab_switch"):
+		_cycle_tab()
+	# Right trigger = rapid click (handled via _process polling).
+
+var _rapid_click_accumulator: float = 0.0
+func _process_rapid_click(delta: float) -> void:
+	if Input.is_action_pressed("gamepad_rapid_click"):
+		_rapid_click_accumulator += delta
+		if _rapid_click_accumulator >= 0.1:  # 10 clicks/s
+			_rapid_click_accumulator = 0.0
+			_do_click()
+	else:
+		_rapid_click_accumulator = 0.0
+
+func _cycle_tab() -> void:
+	var count := _tab_container.get_tab_count()
+	_tab_container.current_tab = (_tab_container.current_tab + 1) % count
+
+func _update_unhinged_chaos(delta: float) -> void:
+	# GDD §3.2: Unhinged mode — the number pushes other elements around.
+	if GameState.settings["notation"] != "unhinged":
+		_unhinged_chaos_timer = 0.0
+		return
+	_unhinged_chaos_timer += delta
+	if _unhinged_chaos_timer < 2.0:
+		return
+	_unhinged_chaos_timer = 0.0
+	# Apply a brief chaotic nudge to a random upgrade row.
+	var ids := _upgrade_rows.keys()
+	if ids.is_empty():
+		return
+	var pick: String = ids[randi() % ids.size()]
+	var row: Dictionary = _upgrade_rows[pick]
+	var root: Control = row.get("root", null)
+	if root == null:
+		return
+	var tween := create_tween()
+	var offset_x := randf_range(-6.0, 6.0)
+	var rot := randf_range(-0.02, 0.02)
+	tween.tween_property(root, "position:x", root.position.x + offset_x, 0.3).set_trans(Tween.TRANS_SINE)
+	tween.parallel().tween_property(root, "rotation", rot, 0.3)
+	tween.chain().tween_property(root, "position:x", root.position.x, 0.4)
+	tween.parallel().tween_property(root, "rotation", 0.0, 0.4)
 
 func _do_click() -> void:
 	GameState.click()
@@ -1080,7 +1158,20 @@ func _on_color_hue_changed(value: float) -> void:
 # --- Color / corruption -----------------------------------------------------
 func _apply_number_color() -> void:
 	if _gold_flash_remaining > 0.0:
-		_number_label.add_theme_color_override("font_color", COLOR_GOLD)
+		# Fade from gold to actual color over the remaining duration.
+		var base_color: Color
+		if GameState.red_count >= 6:
+			base_color = COLOR_RED
+		elif GameState.settings.get("color_override_enabled", false) and GameState.transcendence_level > 0:
+			var hue: float = GameState.settings.get("color_override_hue", 0.0)
+			base_color = Color.from_hsv(hue, 0.6, 1.0)
+		elif GameState.transcendence_level > 0:
+			base_color = GameState.transcendence_color()
+		else:
+			base_color = COLOR_GREEN
+		var t := _gold_flash_remaining / 10.0
+		var blended := COLOR_GOLD.lerp(base_color, 1.0 - t)
+		_number_label.add_theme_color_override("font_color", blended)
 		return
 	if GameState.red_count >= 6:
 		_number_label.add_theme_color_override("font_color", COLOR_RED)

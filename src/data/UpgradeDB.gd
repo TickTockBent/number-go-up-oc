@@ -110,3 +110,17 @@ static func tier_unlocked(tier: int, total_earned: float) -> bool:
 
 static func is_trap(id: String) -> bool:
 	return id in ["red", "slow", "mystery", "void", "anti_slow"]
+
+## Sales milestone upgrades (GDD §17). These appear only if the game has sold
+## enough copies. The sales count is a stub — in production it would be read
+## from Steam stats or a backend. For now always returns 0.
+static func get_sales_count() -> int:
+	return 0
+
+static func has_milestone_upgrade() -> bool:
+	return get_sales_count() >= 100000
+
+static func get_milestone_description() -> String:
+	if get_sales_count() >= 1000000:
+		return "Seriously?"
+	return "100,000 people bought this game. This upgrade is for them. It does nothing."
