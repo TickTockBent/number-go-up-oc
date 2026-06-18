@@ -877,6 +877,7 @@ func _process(delta: float) -> void:
 	_update_slow_ghost(delta)
 	_process_rapid_click(delta)
 	_update_unhinged_chaos(delta)
+	_track_tab_activity(delta)
 	# Cheater overlay stays visible while penalty active.
 	_cheater_overlay.visible = SaveSystem.is_cheater_active()
 
