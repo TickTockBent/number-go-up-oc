@@ -52,6 +52,9 @@ var _settings_color_hue_label: Label
 # --- Cards tab --------------------------------------------------------------
 var _cards_viewed: bool = false
 
+# --- Workshop tab -----------------------------------------------------------
+var _workshop_container: VBoxContainer
+
 var _upgrade_rows: Dictionary = {}      # id -> {root, name, desc, cost, owned, btn}
 var _last_prestige_time: float = 0.0
 var _gold_flash_remaining: float = 0.0
@@ -83,6 +86,7 @@ func _ready() -> void:
 	FunnyNumbers.popup_fired.connect(_on_funny_popup)
 	SaveSystem.cheater_detected.connect(_show_cheater)
 	SteamIntegration.dlc_status_changed.connect(_on_dlc_changed)
+	WorkshopManager.packs_changed.connect(_refresh_workshop_list)
 	_base_position = position
 
 func _build_ui() -> void:
@@ -550,20 +554,142 @@ func _build_settings_tab() -> void:
 		vbox.add_child(_settings_color_hue_label)
 
 func _build_workshop_tab() -> void:
-	var tab := VBoxContainer.new()
-	tab.name = "Workshop"
-	_tab_container.add_child(tab)
+	var scroll := ScrollContainer.new()
+	scroll.name = "Workshop"
+	_tab_container.add_child(scroll)
+	var vbox := VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(vbox)
+
 	var title := Label.new()
 	title.text = "STEAM WORKSHOP"
 	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", COLOR_GOLD)
-	tab.add_child(title)
-	var placeholder := Label.new()
-	placeholder.text = "\nCommunity meme packs for funny number popups.\n\nThis feature is coming in Phase 4.\n\nWe are not responsible for what the community does with this."
-	placeholder.add_theme_color_override("font_color", COLOR_DIM)
-	placeholder.add_theme_font_size_override("font_size", 16)
-	placeholder.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tab.add_child(placeholder)
+	vbox.add_child(title)
+
+	var subtitle := Label.new()
+	subtitle.text = "Community meme packs for funny number popups. We are not responsible for what the community does with this."
+	subtitle.add_theme_color_override("font_color", COLOR_DIM)
+	subtitle.add_theme_font_size_override("font_size", 13)
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(subtitle)
+
+	vbox.add_child(HSeparator.new())
+
+	# Browse Workshop button.
+	var browse_btn := Button.new()
+	browse_btn.text = "Browse Workshop on Steam"
+	browse_btn.add_theme_font_size_override("font_size", 16)
+	browse_btn.custom_minimum_size = Vector2(0, 40)
+	browse_btn.pressed.connect(_on_browse_workshop)
+	vbox.add_child(browse_btn)
+
+	var refresh_btn := Button.new()
+	refresh_btn.text = "Refresh Installed Packs"
+	refresh_btn.add_theme_font_size_override("font_size", 14)
+	refresh_btn.pressed.connect(_on_refresh_packs)
+	vbox.add_child(refresh_btn)
+
+	vbox.add_child(HSeparator.new())
+
+	var packs_header := Label.new()
+	packs_header.text = "INSTALLED PACKS"
+	packs_header.add_theme_font_size_override("font_size", 18)
+	packs_header.add_theme_color_override("font_color", COLOR_DIM)
+	vbox.add_child(packs_header)
+
+	# Pack list container — rebuilt on scan.
+	_workshop_container = vbox
+	_refresh_workshop_list()
+
+func _refresh_workshop_list() -> void:
+	# Remove old pack entries (everything after the header).
+	var children := _workshop_container.get_children()
+	var start_idx := 0
+	for i in children.size():
+		if children[i] is Label and children[i].text == "INSTALLED PACKS":
+			start_idx = i + 1
+			break
+	for i in range(children.size() - 1, start_idx, -1):
+		children[i].queue_free()
+
+	var packs := WorkshopManager.get_packs()
+	if packs.is_empty():
+		var none := Label.new()
+		none.text = "\nNo packs installed. Subscribe to packs on the Steam Workshop, or create your own and place them in the packs folder."
+		none.add_theme_color_override("font_color", COLOR_DIM)
+		none.add_theme_font_size_override("font_size", 14)
+		none.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_workshop_container.add_child(none)
+		return
+
+	for pack in packs:
+		var manifest: Dictionary = pack.manifest
+		var pack_row := HBoxContainer.new()
+		pack_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_workshop_container.add_child(pack_row)
+
+		# Enable/disable toggle.
+		var toggle := CheckButton.new()
+		toggle.button_pressed = pack.enabled
+		toggle.toggled.connect(_on_pack_toggled.bind(pack.folder_name))
+		pack_row.add_child(toggle)
+
+		# Pack info.
+		var info_col := VBoxContainer.new()
+		info_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		pack_row.add_child(info_col)
+		var name_lbl := Label.new()
+		name_lbl.text = manifest.get("name", pack.folder_name)
+		name_lbl.add_theme_font_size_override("font_size", 16)
+		info_col.add_child(name_lbl)
+		var author_lbl := Label.new()
+		author_lbl.text = "by %s  |  v%s  |  priority: %d  |  source: %s" % [
+			manifest.get("author", "unknown"),
+			manifest.get("version", "?"),
+			manifest.get("priority", 0),
+			pack.source,
+		]
+		author_lbl.add_theme_color_override("font_color", COLOR_DIM)
+		author_lbl.add_theme_font_size_override("font_size", 12)
+		info_col.add_child(author_lbl)
+		if manifest.has("description"):
+			var desc_lbl := Label.new()
+			desc_lbl.text = manifest.get("description", "")
+			desc_lbl.add_theme_color_override("font_color", COLOR_DIM)
+			desc_lbl.add_theme_font_size_override("font_size", 12)
+			desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			info_col.add_child(desc_lbl)
+
+		# Priority up/down buttons.
+		var up_btn := Button.new()
+		up_btn.text = "\u2191"
+		up_btn.custom_minimum_size = Vector2(36, 36)
+		up_btn.pressed.connect(_on_pack_up.bind(pack.folder_name))
+		pack_row.add_child(up_btn)
+		var down_btn := Button.new()
+		down_btn.text = "\u2193"
+		down_btn.custom_minimum_size = Vector2(36, 36)
+		down_btn.pressed.connect(_on_pack_down.bind(pack.folder_name))
+		pack_row.add_child(down_btn)
+
+func _on_browse_workshop() -> void:
+	WorkshopManager.browse_workshop()
+
+func _on_refresh_packs() -> void:
+	WorkshopManager.scan_packs()
+	_refresh_workshop_list()
+
+func _on_pack_toggled(enabled: bool, folder_name: String) -> void:
+	WorkshopManager.set_pack_enabled(folder_name, enabled)
+
+func _on_pack_up(folder_name: String) -> void:
+	WorkshopManager.move_pack_up(folder_name)
+	_refresh_workshop_list()
+
+func _on_pack_down(folder_name: String) -> void:
+	WorkshopManager.move_pack_down(folder_name)
+	_refresh_workshop_list()
 
 func _add_settings_label(parent: Container, text: String) -> void:
 	var lbl := Label.new()
@@ -884,7 +1010,6 @@ func _on_dlc_changed(_active: bool) -> void:
 
 func _on_offline_report(_gained: float) -> void:
 	AudioManager.on_offline_return()
-
 # --- Input ------------------------------------------------------------------
 func _on_click_area_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -996,6 +1121,18 @@ func _spawn_floating_text(text: String) -> void:
 	tween.chain().tween_callback(lbl.queue_free)
 
 func _spawn_funny_popup(entry: Dictionary) -> void:
+	var pattern: String = entry.pattern
+	var override: Variant = WorkshopManager.resolve_popup(pattern)
+	if override != null and typeof(override) == TYPE_DICTIONARY:
+		var override_type: String = override.type
+		match override_type:
+			"image":
+				_spawn_image_popup(override.path, entry)
+				return
+			"video":
+				_spawn_video_popup(override.path, entry)
+				return
+	# Default: text popup.
 	var lbl := Label.new()
 	lbl.text = entry.label
 	var color := Color.from_string(entry.color, COLOR_GOLD)
@@ -1015,6 +1152,70 @@ func _spawn_funny_popup(entry: Dictionary) -> void:
 	tween.parallel().tween_property(lbl, "position:y", lbl.position.y - 90, 2.2)
 	tween.parallel().tween_property(lbl, "modulate:a", 0.0, 2.2)
 	tween.chain().tween_callback(lbl.queue_free)
+
+func _spawn_image_popup(file_path: String, entry: Dictionary) -> void:
+	var texture := WorkshopManager.load_image_from_file(file_path)
+	if texture == null:
+		_spawn_funny_popup(entry)  # fallback to text
+		return
+	var rect := TextureRect.new()
+	rect.texture = texture
+	rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var max_size := 300
+	if texture.get_width() > max_size or texture.get_height() > max_size:
+		var scale_factor: float = float(max_size) / max(texture.get_width(), texture.get_height())
+		rect.custom_minimum_size = Vector2(texture.get_width() * scale_factor, texture.get_height() * scale_factor)
+	else:
+		rect.custom_minimum_size = Vector2(texture.get_width(), texture.get_height())
+	var screen := get_viewport_rect().size
+	rect.position = Vector2(
+		screen.x * randf_range(0.10, 0.70),
+		screen.y * randf_range(0.15, 0.45)
+	)
+	rect.rotation = deg_to_rad(randf_range(-15.0, 15.0))
+	rect.z_index = 100
+	_overlay.add_child(rect)
+	var tween := create_tween()
+	tween.tween_property(rect, "scale", Vector2(1.5, 1.5), 0.15).from(Vector2(0.2, 0.2))
+	tween.tween_property(rect, "scale", Vector2(1.0, 1.0), 0.15)
+	tween.parallel().tween_property(rect, "position:y", rect.position.y - 90, 2.2)
+	tween.parallel().tween_property(rect, "modulate:a", 0.0, 2.2)
+	tween.chain().tween_callback(rect.queue_free)
+
+func _spawn_video_popup(file_path: String, entry: Dictionary) -> void:
+	var stream := load_video_stream(file_path)
+	if stream == null:
+		_spawn_image_popup(file_path, entry)  # try as image, then fallback
+		return
+	var player := VideoStreamPlayer.new()
+	player.stream = stream
+	player.autoplay = true
+	player.loop = false
+	player.custom_minimum_size = Vector2(320, 240)
+	var screen := get_viewport_rect().size
+	player.position = Vector2(
+		screen.x * randf_range(0.10, 0.60),
+		screen.y * randf_range(0.15, 0.40)
+	)
+	player.z_index = 100
+	_overlay.add_child(player)
+	var tween := create_tween()
+	tween.tween_property(player, "scale", Vector2(1.5, 1.5), 0.15).from(Vector2(0.2, 0.2))
+	tween.tween_property(player, "scale", Vector2(1.0, 1.0), 0.15)
+	tween.parallel().tween_property(player, "position:y", player.position.y - 90, 2.2)
+	tween.parallel().tween_property(player, "modulate:a", 0.0, 2.2)
+	tween.chain().tween_callback(player.queue_free)
+
+func load_video_stream(file_path: String) -> VideoStream:
+	var ext := file_path.get_extension().to_lower()
+	if ext == "ogv":
+		return load(file_path) as VideoStream
+	# WebM support depends on engine build; try loading.
+	var loaded: Variant = load(file_path)
+	if loaded is VideoStream:
+		return loaded
+	return null
 
 func _show_cheater() -> void:
 	_message_label.text = "Nice try."

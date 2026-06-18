@@ -18,6 +18,7 @@ SaveSystem="*res://src/autoload/SaveSystem.gd"
 FunnyNumbers="*res://src/autoload/FunnyNumbers.gd"
 SteamIntegration="*res://src/autoload/SteamIntegration.gd"
 AudioManager="*res://src/autoload/AudioManager.gd"
+WorkshopManager="*res://src/autoload/WorkshopManager.gd"
 
 [display]
 

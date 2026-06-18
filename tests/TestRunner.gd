@@ -29,6 +29,7 @@ func _ready() -> void:
 	_test_save_roundtrip()
 	_test_settings_roundtrip()
 	_test_audio_system()
+	_test_workshop_system()
 	print("=== results: %d passed, %d failed ===" % [_passed, _failed])
 	get_tree().quit(0 if _failed == 0 else 1)
 
@@ -377,3 +378,41 @@ func _test_audio_system() -> void:
 	# Post-prestige cut should work.
 	AudioManager.trigger_post_prestige_cut()
 	_ok(AudioManager._post_prestige_cut_remaining > 0.0, "post-prestige cut triggered")
+
+func _test_workshop_system() -> void:
+	print("[workshop]")
+	WorkshopManager._packs.clear()
+	WorkshopManager._clear_caches()
+	var manifest: Dictionary = {
+		"name": "Test Pack",
+		"author": "tester",
+		"version": "1.0",
+		"priority": 50,
+		"description": "A test pack",
+	}
+	var pack_path: String = WorkshopManager.create_local_pack("_test_pack", manifest)
+	_ok(pack_path != "", "local pack created")
+	_ok(WorkshopManager.get_pack_count() >= 1, "pack scanned")
+	_ok(WorkshopManager.get_enabled_count() >= 1, "pack enabled by default")
+	WorkshopManager.set_pack_enabled("_test_pack", false)
+	_ok(WorkshopManager.get_enabled_count() == 0, "pack disabled")
+	WorkshopManager.set_pack_enabled("_test_pack", true)
+	_ok(WorkshopManager.get_enabled_count() >= 1, "pack re-enabled")
+	var resolved: Variant = WorkshopManager.resolve_popup("69")
+	_ok(resolved == null, "resolve_popup returns null when no file exists")
+	_ok(WorkshopManager.resolve_sound("click") == "", "resolve_sound returns empty when no file exists")
+	var manifest2: Dictionary = {"name": "High Priority Pack", "author": "tester2", "version": "1.0", "priority": 100}
+	WorkshopManager.create_local_pack("_test_pack_2", manifest2)
+	var packs: Array = WorkshopManager.get_packs()
+	_ok(packs.size() >= 2, "two packs scanned")
+	WorkshopManager.move_pack_up("_test_pack")
+	WorkshopManager.move_pack_down("_test_pack")
+	_ok(true, "move_pack_up/down don't crash")
+	var dir := DirAccess.open(WorkshopManager.PACKS_DIR)
+	if dir != null:
+		dir.remove("_test_pack/pack.json")
+		dir.remove("_test_pack")
+		dir.remove("_test_pack_2/pack.json")
+		dir.remove("_test_pack_2")
+	WorkshopManager.scan_packs()
+	_ok(true, "cleanup succeeded")

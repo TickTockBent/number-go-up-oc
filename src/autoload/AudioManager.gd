@@ -206,9 +206,20 @@ func _crossfade_stems(delta: float) -> void:
 func play_sfx(event_id: String) -> void:
 	if not _audio_initialized:
 		return
+	# Check for Workshop pack override first.
+	var override_path := WorkshopManager.resolve_sound(event_id)
+	if override_path != "":
+		var override_stream: Variant = WorkshopManager.load_audio_from_file(override_path)
+		if override_stream is AudioStream:
+			_play_on_pool(override_stream, event_id)
+			return
+	# Fall back to synthesized SFX.
 	var stream: AudioStreamWAV = _sfx.get(event_id)
 	if stream == null:
 		return
+	_play_on_pool(stream, event_id)
+
+func _play_on_pool(stream: AudioStream, event_id: String) -> void:
 	var player: AudioStreamPlayer = _sfx_pool[_sfx_pool_index]
 	_sfx_pool_index = (_sfx_pool_index + 1) % SFX_POOL_SIZE
 	# Click pitch varies ±5% (GDD §12.2).
@@ -222,7 +233,18 @@ func play_sfx(event_id: String) -> void:
 func play_stinger(pattern: String) -> void:
 	if not _audio_initialized:
 		return
+	# Check for Workshop pack override first.
+	var override_path := WorkshopManager.resolve_sound(pattern)
+	if override_path != "":
+		var override_stream: Variant = WorkshopManager.load_audio_from_file(override_path)
+		if override_stream is AudioStream:
+			_play_stinger_on_stream(override_stream)
+			return
+	# Fall back to synthesized stinger.
 	var stream: AudioStreamWAV = _stingers.get(pattern, _stingers["_default"])
+	_play_stinger_on_stream(stream)
+
+func _play_stinger_on_stream(stream: AudioStream) -> void:
 	var player: AudioStreamPlayer = _sfx_pool[_sfx_pool_index]
 	_sfx_pool_index = (_sfx_pool_index + 1) % SFX_POOL_SIZE
 	player.bus = BUS_STINGER
